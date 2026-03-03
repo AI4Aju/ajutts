@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>我的語音助手</title>
+    <style>
+        :root { --primary: #1a73e8; --bg: #f0f2f5; }
+        body { font-family: sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; }
+        .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 450px; }
+        h2 { color: var(--primary); margin-bottom: 20px; font-size: 24px; text-align: center; }
+        input[type="password"] { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; }
+        textarea { width: 100%; height: 200px; padding: 15px; border: 1px solid #ddd; border-radius: 12px; resize: none; box-sizing: border-box; font-size: 16px; line-height: 1.6; }
+        .hint { font-size: 12px; color: #888; margin-bottom: 15px; text-align: center; }
+        button { width: 100%; background: var(--primary); color: white; border: none; padding: 16px; border-radius: 12px; cursor: pointer; font-size: 18px; font-weight: bold; transition: 0.3s; margin-top: 10px; }
+        button:active { transform: scale(0.98); opacity: 0.9; }
+        button:disabled { background: #ccc; }
+        #status { margin-top: 15px; text-align: center; font-size: 14px; color: #666; min-height: 1.5em; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Gemini 語音讀報</h2>
+    
+    <input type="password" id="apiKey" placeholder="在此輸入 API Key (會自動儲存)">
+    <div class="hint">金鑰儲存於本機瀏覽器，安全無虞</div>
+
+    <textarea id="inputText" placeholder="直接貼上文字..."></textarea>
+    
+    <button id="playBtn" onclick="startProcess()">立即朗讀</button>
+    <div id="status">準備就緒</div>
+</div>
+
+<script>
+    const statusDiv = document.getElementById('status');
+    const playBtn = document.getElementById('playBtn');
+
+    // 1. 自動載入儲存的 Key
+    window.onload = () => {
+        const savedKey = localStorage.getItem('gemini_key');
+        if (savedKey) document.getElementById('apiKey').value = savedKey;
+    };
+
+    async function startProcess() {
+        const apiKey = document.getElementById('apiKey').value;
+        const text = document.getElementById('inputText').value;
+
+        if (!apiKey || !text) return alert("請確認 Key 與文字皆已輸入");
+
+        // 2. 儲存 Key 方便下次使用
+        localStorage.setItem('gemini_key', apiKey);
+        
+        setLoading(true);
+        statusDiv.innerText = "Gemini 分析中...";
+
+        try {
+            // 這裡可以選擇：A. 讓 Gemini 潤稿後再讀 / B. 直接讀
+            // 為了「方便」，我們直接讀取你貼上的原文
+            statusDiv.innerText = "準備發聲...";
+            speak(text); 
+        } catch (e) {
+            statusDiv.innerText = "錯誤: " + e.message;
+            setLoading(false);
+        }
+    }
+
+    function speak(text) {
+        window.speechSynthesis.cancel(); // 先停止之前的播放
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        // 挑選手機裡最好聽的中文聲音
+        const voices = window.speechSynthesis.getVoices();
+        const chineseVoice = voices.find(v => (v.name.includes('Google') || v.name.includes('Apple')) && v.lang.includes('zh')) 
+                           || voices.find(v => v.lang.includes('zh'));
+        
+        if (chineseVoice) utterance.voice = chineseVoice;
+        utterance.rate = 1.0; // 語速：1.0 是正常
+        utterance.pitch = 1.0;
+
+        utterance.onstart = () => statusDiv.innerText = "正在朗讀...";
+        utterance.onend = () => {
+            statusDiv.innerText = "播放完成";
+            setLoading(false);
+        };
+        utterance.onerror = () => {
+            statusDiv.innerText = "播放失敗";
+            setLoading(false);
+        };
+
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function setLoading(bool) {
+        playBtn.disabled = bool;
+        playBtn.innerText = bool ? "處理中..." : "立即朗讀";
+    }
+
+    // 解決部分手機瀏覽器語音清單載入延遲問題
+    window.speechSynthesis.onvoiceschanged = () => console.log("Voices loaded");
+</script>
+
+</body>
+</html>
